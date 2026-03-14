@@ -10,8 +10,8 @@ from simulate.mp import *
 
 # Cấu hình cho phần MP integer
 REPEATS = 100    
-RESULTS_PATH = "data/Results.md"
-STATS_PATH   = "data/MP_stats.md"
+RESULTS_PATH = "statistic/Results.md"
+STATS_PATH   = "statistic/MP_stats.md"
 
 # OMP float
 def run_omp():
