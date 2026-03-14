@@ -29,6 +29,7 @@ Quy trình gồm các bước:
 ---
 
 # 2. Cấu trúc project
+```
 CS_Simulation
 │
 ├── simulate
@@ -51,6 +52,7 @@ CS_Simulation
 │ ├── Reconstruct.png
 │
 └── main.py
+```
 ---
 
 # 3. Thuật toán sử dụng
