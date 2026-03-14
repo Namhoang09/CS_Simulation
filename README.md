@@ -94,20 +94,27 @@ Khác biệt:
 
 ## RMSE theo SNR
 
-![RMSE SNR](figure/RMSE_SNR_OMP.png)
+![RMSE SNR_OMP](figure/RMSE_SNR_OMP.png)
+![RMSE SNR_MP](figure/RMSE_SNR_MP.png)
 
 ---
 
 # 5. Chạy mô phỏng
 
-Chạy toàn bộ mô phỏng:
+## Chạy toàn bộ mô phỏng:
+
 python main.py
 
-Chạy test riêng:
+## Chạy test riêng:
+
 python test_mp.py
+
+python test_snr_mp.py
+
 python test_snr_mp.py
 
 ---
 
 # 6. Tác giả
+
 Đặng Hoàng Nam
