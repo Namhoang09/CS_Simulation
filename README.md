@@ -41,8 +41,9 @@ CS_Simulation
 │
 ├── fpga
 | ├── data
-| │ ├── po.mem
-| │ ├── theta.mem
+| │ ├── po_vector.txt
+| │ ├── theta_matrix.txt
+| │ ├── expected_coef.txt
 │ ├── gen_mp_data.py
 │ ├── gen_mem.py
 │
