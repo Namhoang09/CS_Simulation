@@ -1,109 +1,79 @@
-#!/usr/bin/env python3
-"""
-gen_mp_test_data.py  –  Sinh theta.mem và po.mem cho Nd_t = ND_REAL = 100
-Chạy 1 lần trước khi simulate MP core trong ModelSim.
-
-Output (cùng thư mục với file .sv):
-    theta.mem  –  4000 entries × 6 hex digits (Theta[M×NE], 24-bit signed)
-    po.mem     –    20 entries × 4 hex digits (Po[M],       16-bit signed)
-"""
-
 import numpy as np
 
-# ─── Tham số (khớp config_pkg.sv) ──────────────────────────────────────────
-NE      = 200
-NC      = 200
-M_OBS   = 20
-ND_REAL = 100     # Nd thật → đây là input đo được của sensor
-FC1     = 100e6
-FC2     = 110e6
-FS      = 2e9
-DT      = 1.0 / FS
-AP      = 30
-FRAC_D  = 14      # D_INT = round(D × 2^14)
-SEED    = 0xACE12345
+# =====================================================================
+# 1. Cấu hình tham số hệ thống (Phải khớp với file SystemVerilog)
+# =====================================================================
+M = 20        # Số hàng (số mẫu Photodiode)
+NE = 200      # Số cột (Cửa sổ phơi sáng)
+K = 7         # Số vòng lặp Matching Pursuit
 
-# ─── 1. Carrier S[n] ────────────────────────────────────────────────────────
-n     = np.arange(NE)
-S_int = np.round(AP * (2 + np.cos(2*np.pi*FC1*n*DT)
-                         + np.cos(2*np.pi*FC2*n*DT))).astype(np.int32)
-print(f"S  : range [{S_int.min()}, {S_int.max()}]  (expected [1,120])")
+# Hệ số Scale (Q-format) để chuyển số thực (float) thành số nguyên (integer) cho FPGA
+# Ta dùng 15 bit cho phần thập phân.
+SCALE_FACTOR = 2**15  
 
-# ─── 2. Dictionary D[NE×NE] Q1.14 ──────────────────────────────────────────
-D = np.zeros((NE, NE), dtype=np.float64)
-D[:, 0] = 1.0 / np.sqrt(NE)
-k, col = 1, 1
-while col < NE - 1:
-    D[:, col]   = np.sqrt(2.0/NE) * np.cos(2*np.pi*k*n/NE)
-    D[:, col+1] = np.sqrt(2.0/NE) * np.sin(2*np.pi*k*n/NE)
-    col += 2; k += 1
-if NE % 2 == 0:
-    D[:, NE-1] = (1.0/np.sqrt(NE)) * np.cos(np.pi * n)
-D_int = np.round(D * 2**FRAC_D).astype(np.int16)
-print(f"D  : range [{D_int.min()}, {D_int.max()}]  (expected ~[-1638,1638])")
+# =====================================================================
+# 2. Tạo dữ liệu giả lập (Mock Data)
+# =====================================================================
+np.random.seed(42) # Cố định seed để kết quả các lần chạy giống nhau
 
-# ─── 3. LFSR g[] (khớp lfsr_g.sv) ──────────────────────────────────────────
-G_LEN = (NC - 1) + (M_OBS - 1) * NC + NE  # = 4199
-lfsr  = SEED & 0xFFFFFFFF
-g     = np.zeros(G_LEN, dtype=np.uint8)
-for i in range(G_LEN):
-    g[i]    = lfsr & 1
-    new_bit = ((lfsr>>31) ^ (lfsr>>21) ^ (lfsr>>1) ^ lfsr) & 1
-    lfsr    = ((lfsr >> 1) | (new_bit << 31)) & 0xFFFFFFFF
-print(f"g  : {int(g.sum())} ones / {G_LEN}  ({100*g.mean():.1f}%)")
+# Tạo ma trận đo lường Theta (M x NE) ngẫu nhiên
+Theta_float = np.random.randn(M, NE)
 
-# ─── 4. Po[M] = Σ_{n: g[ND_REAL+m*NC+n]=1} S[n] ────────────────────────────
-Po = np.zeros(M_OBS, dtype=np.int32)
-for m in range(M_OBS):
-    for ni in range(NE):
-        if g[ND_REAL + m*NC + ni]:
-            Po[m] += S_int[ni]
-print(f"Po : range [{Po.min()}, {Po.max()}]  (expected ~[5000,9000])")
+# QUAN TRỌNG: Chuẩn hóa các cột của Theta để độ dài bằng 1
+# Điều này giúp loại bỏ phép chia trong FPGA (alpha = corr / 1 = corr)
+for j in range(NE):
+    norm = np.linalg.norm(Theta_float[:, j])
+    if norm > 0:
+        Theta_float[:, j] = Theta_float[:, j] / norm
 
-# ─── 5. Theta[M×NE] = A(ND_REAL) @ D_int ────────────────────────────────────
-# Dùng ND_REAL để test: ModelSim sẽ chạy MP với đúng input thật
-Theta = np.zeros((M_OBS, NE), dtype=np.int32)
-for m in range(M_OBS):
-    for ni in range(NE):
-        if g[ND_REAL + m*NC + ni]:
-            Theta[m, :] += D_int[ni, :].astype(np.int32)
-print(f"Theta: range [{Theta.min()}, {Theta.max()}]  (expected ~[-2000,9000])")
+# Tạo tín hiệu thưa gốc (chỉ có 2 thành phần tần số f_c1 và f_c2 có giá trị)
+true_coef_float = np.zeros(NE)
+true_coef_float[25] = 0.85  # Tần số 1
+true_coef_float[150] = 0.60 # Tần số 2
 
-# ─── 6. Verify nhanh (Python MP để biết coefs đúng phải ra sao) ─────────────
-print("\n--- Python MP reference (K=7) ---")
-r     = Po.astype(np.float64)
-coefs = np.zeros(NE, dtype=np.float64)
-Theta_f = Theta.astype(np.float64)
-for iteration in range(7):
-    corr    = Theta_f.T @ r
-    idx     = np.argmax(np.abs(corr))
-    norm_sq = Theta_f[:, idx] @ Theta_f[:, idx]
-    alpha   = corr[idx] / norm_sq
-    coefs[idx] += alpha
-    r -= alpha * Theta_f[:, idx]
-    print(f"  K={iteration+1}: idx={idx:3d}  alpha={alpha:10.2f}  "
-          f"|r|={np.linalg.norm(r):.1f}")
+# Tính vector Po (Tín hiệu Photodiode thu được)
+# Po = Theta * true_coef
+Po_float = np.dot(Theta_float, true_coef_float)
 
-D_f   = D_int.astype(np.float64) / 2**FRAC_D
-S_rec = D_f @ coefs
-mse   = np.sum((S_int.astype(np.float64) - S_rec)**2)
-print(f"MSE tại Nd=100 (Python ref): {mse:.1f}")
-print(f"Nonzero coefs: {np.sum(np.abs(coefs) > 0.01)}")
+# =====================================================================
+# 3. Chạy thuật toán Matching Pursuit (MP) trên Python để lấy "Đáp án"
+# =====================================================================
+r = Po_float.copy()
+expected_coef_float = np.zeros(NE)
 
-# ─── 7. Ghi theta.mem ────────────────────────────────────────────────────────
-# Format: M_OBS × NE entries, mỗi entry 6 hex digits (24-bit two's complement)
-# Layout dòng: m*NE + k  →  Theta[m][k]
-with open("./fpga/data/theta.mem", "w") as f:
-    for m in range(M_OBS):
-        for k in range(NE):
-            val = int(Theta[m, k]) & 0xFFFFFF
-            f.write(f"{val:06X}\n")
-print(f"\n✓ theta.mem  ({M_OBS*NE} entries, 24-bit hex)")
+for i in range(K):
+    # Tính tương quan: corr = Theta^T * r
+    corr = np.dot(Theta_float.T, r)
+    
+    # Tìm index j* có giá trị tuyệt đối lớn nhất
+    best_j = np.argmax(np.abs(corr))
+    
+    # Cập nhật hệ số: alpha = corr[best_j] (do mẫu số norm_sq đã chuẩn hóa = 1)
+    alpha = corr[best_j]
+    expected_coef_float[best_j] += alpha
+    
+    # Cập nhật phần dư r
+    r = r - Theta_float[:, best_j] * alpha
 
-# ─── 8. Ghi po.mem ───────────────────────────────────────────────────────────
-with open("./fpga/data/po.mem", "w") as f:
-    for m in range(M_OBS):
-        val = int(Po[m]) & 0xFFFF
-        f.write(f"{val:04X}\n")
-print(f"✓ po.mem     ({M_OBS} entries, 16-bit hex)")
-print("\nCopy theta.mem và po.mem vào thư mục project ModelSim rồi chạy simulation.")
+# =====================================================================
+# 4. Scale sang Số Nguyên (Fixed-Point) và xuất ra file .txt
+# =====================================================================
+# Ép kiểu int32 cho khớp với THETA_W = 32 và PO_W = 32 trong FPGA
+Theta_int = np.round(Theta_float * SCALE_FACTOR).astype(np.int32)
+Po_int = np.round(Po_float * SCALE_FACTOR).astype(np.int32)
+
+# Riêng mảng Coef có thể bị phóng đại sau nhiều phép tính MAC, 
+# ta cần scale bù trừ tương ứng (tùy thuộc vào thiết kế bit của bạn). 
+# Ở đây ta giữ nguyên nhân 1 lần SCALE.
+expected_coef_int = np.round(expected_coef_float * SCALE_FACTOR).astype(np.int32)
+
+# Lưu ma trận Theta (lưu phẳng thành 1 cột dài M * NE phần tử)
+np.savetxt("fpga/data/theta_matrix.txt", Theta_int.flatten(), fmt='%d')
+
+# Lưu vector Po (M phần tử)
+np.savetxt("fpga/data/po_vector.txt", Po_int, fmt='%d')
+
+# Lưu đáp án Coef (NE phần tử)
+np.savetxt("fpga/data/expected_coef.txt", expected_coef_int, fmt='%d')
+
+print(f"Hoàn tất! Đã lưu {M*NE} phần tử Theta, {M} phần tử Po, và {NE} phần tử Coef vào thư mục 'fpga/data/'.")
