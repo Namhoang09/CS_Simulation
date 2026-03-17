@@ -43,7 +43,7 @@ CS_Simulation
 | ├── data
 | │ ├── po_vector.txt
 | │ ├── theta_matrix.txt
-| │ ├── expected_coef.txt
+| │ ├── d_matrix.txt
 │ ├── gen_mp_data.py
 │ ├── gen_mem.py
 │
