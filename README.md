@@ -40,12 +40,7 @@ CS_Simulation
 │ ├── mp.py
 │
 ├── fpga
-| ├── data
-| │ ├── po_vector.txt
-| │ ├── theta_matrix.txt
-| │ ├── d_matrix.txt
 │ ├── gen_mp_data.py
-│ ├── gen_mem.py
 │
 ├── statistic
 │ ├── Results.md
