@@ -21,9 +21,15 @@ norms[norms == 0] = 1 # Tránh lỗi chia cho 0
 Theta_norm = Theta / norms
 Theta_int = np.round(Theta_norm * (1 << FRAC_D)).astype(np.int32)
 
-# Lưu dữ liệu vào file
-np.savetxt("fpga/data/d_matrix.txt", D_int.flatten(), fmt='%d')
-np.savetxt("fpga/data/theta_matrix.txt", Theta_int.flatten(), fmt='%d')
-np.savetxt("fpga/data/po_vector.txt", Po_int, fmt='%d')
+# Hàm xuất dữ liệu ra file hex
+def export_hex(array, filename, width=32):
+    mask = (1 << width) - 1
+    with open(filename, 'w') as f:
+        for val in array.flatten():
+            f.write(f"{int(val) & mask:08x}\n")
 
-print(f"XONG! Đã lưu 3 file nạp BRAM vào thư mục 'fpga/data/'")
+# Lưu dữ liệu vào file
+export_hex(Theta_int.flatten(), "../CS_FPGA/data/theta_matrix.txt")
+export_hex(Po_int.flatten(),    "../CS_FPGA/data/po_vector.txt")
+
+print(f"XONG! Đã lưu 2 file nạp BRAM vào thư mục 'CS_FPGA/data/'")
