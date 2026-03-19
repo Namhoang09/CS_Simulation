@@ -111,18 +111,17 @@ Khác biệt:
 
 ## Chạy toàn bộ mô phỏng:
 
-python main.py
+* python main.py
 
 ## Chạy test riêng:
 
-python test_mp.py
-
-python test_snr_mp.py
-
-python test_snr_mp.py
+* python test_mp.py
+* python test_snr_mp.py
+* python test_snr_mp.py
 
 ---
 
 # 6. Tác giả
 
-Đặng Hoàng Nam
+* Đặng Hoàng Nam
+* Email: [hnam910204@gmail.com](mailto:hnam910204@gmail.com)
