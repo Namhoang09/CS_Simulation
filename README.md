@@ -40,6 +40,7 @@ CS_Simulation
 │ ├── mp.py
 │
 ├── fpga
+│ ├── compare.py
 │ ├── gen_mp_data.py
 │
 ├── statistic
