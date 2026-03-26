@@ -44,7 +44,7 @@ def mp_integer(Theta_int, Po_int, norm_sq, k):
 
         # Alpha 
         n = int(norm_sq[idx])
-        alpha = int(corr[idx]) // n if n != 0 else 0 
+        alpha = int(corr[idx] / n) if n != 0 else 0 
 
         # Tích lũy hệ số 
         coef_int[idx] += alpha
